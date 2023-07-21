@@ -15,11 +15,11 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
-                </div>
-                <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                    @if(auth()->user()->role_id === 1) 
                     <x-nav-link :href="route('companies.index')" :active="request()->routeIs('companies.index')">
                         {{ __('Companies') }}
                     </x-nav-link>
+                    @endif
                 </div>
             </div>
 
