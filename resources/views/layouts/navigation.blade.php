@@ -15,7 +15,7 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
-                    @if(auth()->user()->role_id === \App\Enums\Role::ADMINISTRATOR) 
+                    @if(auth()->user()->role_id === \App\Enums\Role::ADMINISTRATOR->value) 
                     <x-nav-link :href="route('companies.index')" :active="request()->routeIs('companies.index')">
                         {{ __('Companies') }}
                     </x-nav-link>
@@ -24,7 +24,7 @@
                     <x-nav-link :href="route('companies.users.index', auth()->user()->company_id)" :active="request()->routeIs('companies.users.*')">
                         {{ __('Administrators') }}
                     </x-nav-link>
-                @endif 
+                    @endif 
                 </div>
             </div>
 
