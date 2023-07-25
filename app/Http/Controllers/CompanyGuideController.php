@@ -75,7 +75,7 @@ class CompanyGuideController extends Controller
     {
         $this->authorize('update', $company);
 
-        $company->users()->update($request->validated());
+        $guide->update($request->validated());
 
         return to_route('companies.guides.index', $company);
     }

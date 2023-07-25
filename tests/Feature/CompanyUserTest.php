@@ -141,15 +141,15 @@ class CompanyUserTest extends TestCase
         $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
 
         $response = $this->actingAs($user)->put(route('companies.users.update', [$company->id, $user->id]), [
-            'name' => 'update user',
-            'email' => 'test@update.com',
+            'name' => 'updated user',
+            'email' => 'test@updated.com',
         ]);
 
         $response->assertRedirect(route('companies.users.index', $company));
 
         $this->assertDatabaseHas('users', [
-            'name' => 'update user',
-            'email' => 'test@update.com',
+            'name' => 'updated user',
+            'email' => 'test@updated.com',
             'company_id' => $company->id,
         ]);
     }
