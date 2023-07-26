@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -85,5 +86,205 @@ class CompanyActivityTest extends TestCase
 
         Storage::disk('public')->assertExists('activities/' . $file->hashName());
         // Storage::disk('public')->assertExists('thumbs/' . $file->hashName());
+    }
+
+    public function test_cannon_upload_non_image_file()
+    {
+        Storage::fake('public');
+
+        $company = Company::factory()->create();
+        $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
+        $guide = User::factory()->guide()->create();
+
+        $file = UploadedFile::fake()->create('document.pdf', 2000, 'aplication/pdf');
+
+        $response = $this->actingAs($user)->post(route('companies.activities.store', $company), [
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-07-25 10:00',
+            'price' => 999,
+            'guide_id' => $guide->id,
+            'image' => $file,
+        ]);
+
+        $response->assertSessionHasErrors(['image']);
+
+        Storage::disk('public')->assertMissing('activities/'.$file->hashName());
+    }
+
+    public function test_guides_are_shown_only_for_specific_company_in_create_form()
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
+        $guide = User::factory()->guide()->create(['company_id' => $company->id]);
+
+        $company2 = Company::factory()->create();
+        $guide2 = User::factory()->guide()->create(['company_id' => $company2->id]);
+
+        $response = $this->actingAs($user)->get(route('companies.activities.create', $company));
+
+        $response->assertViewHas('guides', function (Collection $guides) use ($guide) {
+            return $guide->name === $guides[$guide->id];
+        });
+
+        $response->assertViewHas('guides', function (Collection $guides) use ($guide2) {
+            return ! array_key_exists($guide2->id, $guides->toArray());
+        });
+    }
+
+    public function test_guides_are_shown_only_for_specific_company_in_edit_form()
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
+        $guide = User::factory()->guide()->create(['company_id' => $company->id]);
+        $activity = Activity::factory()->create(['company_id' => $company->id]);
+
+        $company2 = Company::factory()->create();
+        $guide2 = User::factory()->guide()->create(['company_id' => $company2->id]);
+
+        $response = $this->actingAs($user)->get(route('companies.activities.edit', [$company, $activity]));
+
+        $response->assertViewHas('guides', function (Collection $guides) use ($guide) {
+            return $guide->name === $guides[$guide->id];
+        });
+
+        $response->assertViewHas('guides', function (Collection $guides) use ($guide2) {
+            return ! array_key_exists($guide2->id, $guides->toArray());
+        });
+    }
+
+    public function test_company_owner_can_edit_activity()
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
+        $guide = User::factory()->guide()->create(['company_id' => $company->id]);
+        $activity = Activity::factory()->create(['company_id' => $company->id]);
+
+        $response = $this->actingAs($user)->put(route('companies.activities.update', [$company, $activity]), [
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-09-01 10:00',
+            'price' => 9999,
+            'guide_id' => $guide->id,
+        ]);
+
+        $response->assertRedirect(route('companies.activities.index', $company));
+
+        $this->assertDatabaseHas('activities', [
+            'company_id' => $company->id,
+            'guide_id' => $guide->id,
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-09-01 10:00',
+            'price' => 999900,
+        ]);
+    }
+
+    public function test_company_owner_cannot_edit_activity_for_other_company()
+    {
+        $company = Company::factory()->create();
+        $company2 = Company::factory()->create();
+        $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
+        $guide = User::factory()->guide()->create();
+        $activity = Activity::factory()->create(['company_id' => $company2->id]);
+
+        $response = $this->actingAs($user)->put(route('companies.activities.update', [$company2, $activity]), [
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-09-01 10:00',
+            'price' => 9999,
+            'guide_id' => $guide->id,
+        ]);
+
+        $response->assertForbidden();
+    }
+
+    public function test_company_owner_can_delete_activity()
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
+        $activity = Activity::factory()->create(['company_id' => $company->id]);
+
+        $response = $this->actingAs($user)->delete(route('companies.activities.destroy', [$company, $activity]));
+
+        $response->assertRedirect(route('companies.activities.index', $company));
+
+        $this->assertModelMissing($activity);
+    }
+
+    public function test_company_owner_cannot_delete_activity_for_other_company()
+    {
+        $company = Company::factory()->create();
+        $company2 = Company::factory()->create();
+        $user = User::factory()->companyOwner()->create(['company_id' => $company->id]);
+        $activity = Activity::factory()->create(['company_id' => $company2->id]);
+
+        $response = $this->actingAs($user)->delete(route('companies.activities.destroy', [$company2, $activity]));
+
+        $this->assertModelExists($activity);
+        $response->assertForbidden();
+    }
+
+    public function test_admin_can_view_companies_activities()
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->admin()->create();
+
+        $response = $this->actingAs($user)->get(route('companies.activities.index', $company));
+
+        $response->assertOk();
+    }
+
+    public function test_admin_can_create_activity_for_company()
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->admin()->create();
+        $guide = User::factory()->guide()->create();
+
+        $response = $this->actingAs($user)->post(route('companies.activities.store', $company), [
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-07-25 10:00',
+            'price' => 9999,
+            'guide_id' => $guide->id,
+        ]);
+
+        $response->assertRedirect(route('companies.activities.index', $company));
+
+        $this->assertDatabaseHas('activities', [
+            'company_id' => $company->id,
+            'guide_id' => $guide->id,
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-07-25 10:00',
+            'price' => 999900,
+        ]);
+    }
+
+    public function test_admin_can_edit_activity_for_company()
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->admin()->create();
+        $guide = User::factory()->guide()->create();
+        $activity = Activity::factory()->create(['company_id' => $company->id]);
+
+        $response = $this->actingAs($user)->put(route('companies.activities.update', [$company, $activity]), [
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-09-01 10:00',
+            'price' => 9999,
+            'guide_id' => $guide->id,
+        ]);
+
+        $response->assertRedirect(route('companies.activities.index', $company));
+
+        $this->assertDatabaseHas('activities', [
+            'company_id' => $company->id,
+            'guide_id' => $guide->id,
+            'name' => 'activity',
+            'description' => 'description',
+            'start_time' => '2023-09-01 10:00',
+            'price' => 999900,
+        ]);
     }
 }
