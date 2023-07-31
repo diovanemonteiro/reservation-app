@@ -106,6 +106,10 @@ class CompanyActivityController extends Controller
     {
         $this->authorize('delete', $company);
 
+        if ($activity->photo) {
+            $this->unlinkPhoto(image: $activity->photo, disk: 'activities');
+        }
+
         $activity->delete();
 
         return to_route('companies.activities.index', $company);
@@ -127,5 +131,10 @@ class CompanyActivityController extends Controller
         Storage::disk('activities')->put('thumbs/' . $request->file('image')->hashName(), $img->stream());
 
         return $filename;
+    }
+
+    private function unlinkPhoto($image, $disk = 'public')
+    {
+        Storage::disk($disk)->delete([$image, 'thumbs/' . $image]);
     }
 }
