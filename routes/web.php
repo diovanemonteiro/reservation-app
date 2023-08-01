@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\ActivityRegisterController;
 use App\Http\Controllers\CompanyActivityController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyGuideController;
@@ -31,14 +32,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/activities/{activity}', [ActivityController::class, 'show'])->name('activity.show');
-Route::post('/activities/{activity}/register', [ActivityController::class, 'store'])->name('activities.register');
+Route::post('/activities/{activity}/register', [ActivityRegisterController::class, 'store'])->name('activities.register');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::get('/activities', [MyActivityController::class, 'show'])->name('my-activity.show');
+    Route::get('my-activities', [MyActivityController::class, 'show'])->name('my-activity.show');
 
     Route::resource('companies', CompanyController::class)->middleware('isAdmin');
     Route::resource('companies.users', CompanyUserController::class)->except('show');
